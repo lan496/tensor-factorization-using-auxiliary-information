@@ -51,7 +51,7 @@ def _tucker_within_mode(tensor, laplacians, n_iter_max, tol, alpha, factors):
         laplacians[i].shape[0] == tensor.shape[i]
     n_iter_max : int
         maximum number of iteration
-    tol : float
+    tol : {None, float}
         tolerance
     alpha : float
         positive regularization constant
@@ -72,13 +72,14 @@ def _tucker_within_mode(tensor, laplacians, n_iter_max, tol, alpha, factors):
         for mode in range(tensor.ndim):
             _update_factor_within(tensor, laplacians, alpha, factors, mode)
 
-        core_tmp = tensorly.tenalg.multi_mode_dot(tensor, [M.T for M in factors])
-        tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core_tmp, factors)
-        err = np.sum(np.pow(tensor_tmp - tensor)) / np.sum(np.pow(tensor, 2))
-        if err < tol:
-            break
+        if tol:
+            core_tmp = tensorly.tenalg.multi_mode_dot(tensor, [M.T for M in factors])
+            tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core_tmp, factors)
+            err = np.sum(np.pow(tensor_tmp - tensor)) / np.sum(np.pow(tensor, 2))
+            if err < tol:
+                break
 
-        if i == n_iter_max - 1:
+        if i == n_iter_max - 1 and tol:
             warn('Could not obtain the convergence in tucker decomposition.')
 
     return core, factors
@@ -88,7 +89,7 @@ def _tucker_cross_mode(tensor, laplacians, n_iter_max, tol, alpha, factors):
     pass
 
 
-def tucker(tensor, ranks, laplacians, n_iter_max, tol, alpha, regular='within', random_state=None):
+def tucker(tensor, ranks, laplacians, n_iter_max, alpha, tol=None, regular='within', random_state=None, factors=None):
     """
     Tucker decompositon using graph laplacians.
 
@@ -103,10 +104,10 @@ def tucker(tensor, ranks, laplacians, n_iter_max, tol, alpha, regular='within', 
         laplacians[i].shape[0] == tensor.shape[i]
     n_iter_max : int
         maximum number of iteration
-    tol : float
-        tolerance
     alpha : float
         positive regularization constant
+    tol : {None, float}
+        tolerance
     regular : {'within', 'cross'}
         a method for regularization
     random_state : {None, int}
@@ -137,8 +138,13 @@ def tucker(tensor, ranks, laplacians, n_iter_max, tol, alpha, regular='within', 
             raise ValueError('laplacian should be a symetric matrix')
 
     # init factors
-    np.random.seed(random_state)
-    factors = [np.random.random_sample((tensor.shape[i], ranks[i]))]
+    if not factors:
+        np.random.seed(random_state)
+        factors = [np.random.random_sample((tensor.shape[i], ranks[i]))
+                   for i in range(tensor.ndim)]
+    else:
+        # TODO: write assertion for facrtors
+        pass
 
     if regular == 'within':
         core, factors = _tucker_within_mode(tensor, laplacians, n_iter_max, tol, alpha, factors)
