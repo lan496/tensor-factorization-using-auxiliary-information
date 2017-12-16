@@ -1,5 +1,3 @@
-from warning import warn
-
 import numpy as np
 import tensorly
 
@@ -28,12 +26,13 @@ def _update_factor_within(tensor, laplacians, alpha, factors, mode):
     mode_list.pop(mode)
     matrix_list = [factor for i, factor in enumerate(factors) if i != mode]
 
-    S_tensor = tensorly.tenalg.multi_mode_dot(tensor, matrix_list, modes=mode_list)
+    # import pdb; pdb.set_trace()
+    S_tensor = tensorly.tenalg.multi_mode_dot(tensor, matrix_list, modes=mode_list, transpose=True)
     S = tensorly.base.unfold(S_tensor, mode)
 
     # w : eigenvalues in ascending order
     # v : normalized eigenvectors
-    w, v = np.linalg.eigh(np.dot(S, S.T) - alpha * laplacian[mode])
+    w, v = np.linalg.eigh(np.dot(S, S.T) - alpha * laplacians[mode])
 
     r = factors[mode].shape[1]
     factors[mode] = v[:, -r:]
@@ -68,19 +67,22 @@ def _tucker_within_mode(tensor, laplacians, n_iter_max, tol, alpha, factors):
         factors[i].shape == (tensor.shape[i], ranks[i])
     """
 
+    core = None
+
     for i in range(n_iter_max):
         for mode in range(tensor.ndim):
             _update_factor_within(tensor, laplacians, alpha, factors, mode)
 
+        core = tensorly.tenalg.multi_mode_dot(tensor, [M.T for M in factors])
+
         if tol:
-            core_tmp = tensorly.tenalg.multi_mode_dot(tensor, [M.T for M in factors])
-            tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core_tmp, factors)
-            err = np.sum(np.pow(tensor_tmp - tensor)) / np.sum(np.pow(tensor, 2))
+            tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core, factors)
+            err = np.sum(np.power(tensor_tmp - tensor)) / np.sum(np.power(tensor, 2))
             if err < tol:
                 break
 
         if i == n_iter_max - 1 and tol:
-            warn('Could not obtain the convergence in tucker decomposition.')
+            print('Could not obtain the convergence in tucker decomposition.')
 
     return core, factors
 
@@ -89,7 +91,19 @@ def _tucker_cross_mode(tensor, laplacians, n_iter_max, tol, alpha, factors):
     pass
 
 
-def tucker(tensor, ranks, laplacians, n_iter_max, alpha, tol=None, regular='within', random_state=None, factors=None):
+def initial_factors(tensor, ranks):
+    factors = []
+
+    for i in range(tensor.ndim):
+        X = tensorly.base.unfold(tensor, i)
+        _, v = np.linalg.eigh(np.dot(X, X.T))
+        factor = v[:, -ranks[i]:]
+        factors.append(factor)
+
+    return factors
+
+
+def tucker(tensor, ranks, laplacians, n_iter_max, alpha, tol=None, regular='within', factors=None):
     """
     Tucker decompositon using graph laplacians.
 
@@ -110,7 +124,6 @@ def tucker(tensor, ranks, laplacians, n_iter_max, alpha, tol=None, regular='with
         tolerance
     regular : {'within', 'cross'}
         a method for regularization
-    random_state : {None, int}
 
     Returns
     -------
@@ -139,9 +152,7 @@ def tucker(tensor, ranks, laplacians, n_iter_max, alpha, tol=None, regular='with
 
     # init factors
     if not factors:
-        np.random.seed(random_state)
-        factors = [np.random.random_sample((tensor.shape[i], ranks[i]))
-                   for i in range(tensor.ndim)]
+        factors = initial_factors(tensor, ranks)
     else:
         # TODO: write assertion for facrtors
         pass

@@ -1,30 +1,33 @@
 import numpy as np
+import tensorly
 
-from tucker import tucker
+from .tucker import tucker
 
 
-def impute(tensor_with_nan, ranks, alpha, regular, tol, interval):
-    fill_value = 0
+def impute(tensor_with_nan, laplacians, ranks, alpha, regular, tol, interval):
+    fill_value = np.nanmean(tensor_with_nan)
 
     tensor = tensor_with_nan.copy()
 
-    for e in tensor.reshape(-1):
-        e = fill_value
+    for index, e in np.ndenumerate(tensor):
+        if np.isnan(e):
+            tensor[index] = fill_value
 
-    tensor, factors = None, None
+    factors = None
 
     while True:
-        for tr, es in zip(tensor_with_nan.reshape(-1), tensor.reshape(-1)):
+        for index, tr in np.ndenumerate(tensor_with_nan):
             if not np.isnan(tr):
-                es = tr
+                tensor[index] = tr
 
-        core, factors = tucker(tensor, ranks, laplacians, n_iter_max=interval, alpha=alpha, tol=None, regular=regular, random_state=None, factors=factors)
+        core, factors = tucker(tensor, ranks, laplacians, n_iter_max=interval, alpha=alpha, tol=None, regular=regular, factors=factors)
+
         tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core, factors)
-
-        variation = np.sum(np.pow(tensor_tmp - tensor, 2)) / np.sum(np.pow(tensor, 2))
+        variation = np.sum(np.power(tensor_tmp - tensor, 2)) / np.sum(np.power(tensor, 2))
+        print(variation)
         if variation < tol:
             break
-        else:
-            tensor = tensor_tmp
+
+        tensor = tensor_tmp
 
     return tensor
