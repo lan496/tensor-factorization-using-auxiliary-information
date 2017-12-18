@@ -1,12 +1,12 @@
-from itertools import product
-
 import numpy as np
-from scipy.linalg import solve_sylvester
-from tensorly.base import unfold
-from tensorly.tenalg import multi_mode_dot
+# from tensorly.base import unfold
+# from tensorly.tenalg import multi_mode_dot
+
+from .tensor import unfold, multi_mode_dot
 
 
-def initial_core_factors(tensor, ranks, alpha, degrees, similarities, random_state=None):
+def initial_core_factors(tensor, ranks, alpha, degrees, similarities,
+                         random_state=None):
     """
     Initialize core and factors for tucker decompostion.
 
@@ -29,14 +29,17 @@ def initial_core_factors(tensor, ranks, alpha, degrees, similarities, random_sta
 
     np.random.seed(random_state)
     core = np.random.random_sample(ranks)
-    factors = [np.random.random_sample((tensor.shape[i], ranks[i])) for i in range(tensor.ndim)]
+    factors = [np.random.random_sample((tensor.shape[i], ranks[i]))
+               for i in range(tensor.ndim)]
     while True:
         for mode in range(tensor.ndim):
             mode_list = list(range(tensor.ndim))
             mode_list.pop(mode)
-            matrix_list = [factor for i, factor in enumerate(factors) if i != mode]
+            matrix_list = [factor for i, factor in enumerate(factors)
+                           if i != mode]
 
-            S_tensor = multi_mode_dot(tensor, matrix_list, modes=mode_list, transpose=True)
+            S_tensor = multi_mode_dot(tensor, matrix_list,
+                                      modes=mode_list, transpose=True)
             S = unfold(S_tensor, mode)
 
             L = degrees[mode] - similarities[mode]
@@ -47,13 +50,15 @@ def initial_core_factors(tensor, ranks, alpha, degrees, similarities, random_sta
             r = factors[mode].shape[1]
             factors[mode] = v[:, -r:]
 
-        print(loss_function_within_mode(tensor, core, factors, alpha, degrees, similarities))
+        print(loss_function_within_mode(tensor, core, factors,
+                                        alpha, degrees, similarities))
 
     core = multi_mode_dot(tensor, factors, transpose=True)
     return core, factors
 
 
-def _tucker_within_mode(tensor, degrees, similarities, n_iter_max, alpha, tol, learning_rate, core, factors):
+def _tucker_within_mode(tensor, degrees, similarities, n_iter_max,
+                        alpha, tol, learning_rate, core, factors):
     """
     Tucker decompositon using graph laplacians with Within_Mode regularization.
 
@@ -83,26 +88,26 @@ def _tucker_within_mode(tensor, degrees, similarities, n_iter_max, alpha, tol, l
     """
 
     for _ in range(n_iter_max):
-        loss_prv = loss_function_within_mode(tensor, core, factors, alpha, degrees, similarities)
+        loss_prv = loss_function_within_mode(tensor, core, factors,
+                                             alpha, degrees, similarities)
         # update factors
         for mode in range(tensor.ndim):
-            tensor_tmp = multi_mode_dot(core, factors)
+            # tensor_tmp = multi_mode_dot(core, factors)
 
             mode_list = list(range(tensor.ndim))
             mode_list.pop(mode)
-            matrix_list = [factor for i, factor in enumerate(factors) if i != mode]
-            S_tensor = multi_mode_dot(core, matrix_list, modes=mode_list)
-            L = degrees[mode] - similarities[mode]
+            # matrix_list = [factor for i, factor in enumerate(factors) if i != mode]
+            # S_tensor = multi_mode_dot(core, matrix_list, modes=mode_list)
+            # L = degrees[mode] - similarities[mode]
 
             """
-            slope = np.dot(unfold(tensor_tmp - tensor, mode), unfold(S_tensor, mode).T)
+            slope = np.dot(unfold(tensor_tmp - tensor, mode),
+            unfold(S_tensor, mode).T)
             slope += alpha * np.dot(L, factors[mode])
 
             factors[mode] -= learning_rate * slope
             """
-            S = unfold(S_tensor, mode)
-            # factors[mode] = solve_sylvester(-alpha * L, np.dot(S, S.T), np.zeros(factors[mode].shape))
-            factors[mode] = -alpha * np.dot(np.dot(L, factors[mode]), np.linalg.inv(np.dot(S, S.T)))
+            # S = unfold(S_tensor, mode)
             loss_crr = loss_function_within_mode(tensor, core, factors, alpha, degrees, similarities)
 
         # update core
@@ -147,7 +152,8 @@ def loss_function_within_mode(tensor, core, factors, alpha, degrees, similaritie
     return loss
 
 
-def tucker(tensor, ranks, similarities, n_iter_max=100, alpha=0.1, tol=1e-5, learning_rate=1e-2, regular='within', core=None, factors=None, random_state=None):
+def tucker(tensor, ranks, similarities, n_iter_max=100, alpha=0.1, tol=1e-5, learning_rate=1e-2, regular='within',
+           core=None, factors=None, random_state=None):
     """
     Tucker decompositon using graph similarities.
 
@@ -192,8 +198,10 @@ def tucker(tensor, ranks, similarities, n_iter_max=100, alpha=0.1, tol=1e-5, lea
             '{0}(length of similarities) != {1}(order of tensor)'.format(len(similarities), tensor.ndim))
     for i, dim in enumerate(tensor.shape):
         if similarities[i].shape[0] != dim:
+            import pdb; pdb.set_trace()
             raise ValueError(
-                '{0}(dimention of similarities[{2}]) != {1}(dimention of mode {2} of tensor)'.format(similarities[i].shape[0], dim, i))
+                '{0}(dimention of similarities[{2}]) != {1}(dimention of mode {2} of tensor)'.format(
+                    similarities[i].shape[0], dim, i))
     for similarity in similarities:
         if similarity.shape[0] != similarity.shape[1] or similarity.ndim != 2:
             raise ValueError('similarity should be a symetric matrix')
@@ -209,7 +217,8 @@ def tucker(tensor, ranks, similarities, n_iter_max=100, alpha=0.1, tol=1e-5, lea
         pass
 
     if regular == 'within':
-        core, factors = _tucker_within_mode(tensor, degrees, similarities, n_iter_max, alpha, tol, learning_rate, core, factors)
+        core, factors = _tucker_within_mode(tensor,
+                                            degrees, similarities, n_iter_max, alpha, tol, learning_rate, core, factors)
     elif regular == 'cross':
         # TODO
         pass

@@ -1,8 +1,6 @@
 import numpy as np
-from tensorly.tenalg import multi_mode_dot
 
-
-from tfaux import impute, tucker
+from tfaux import impute, multi_mode_dot
 
 
 def load_dataset(dim=30, R=2):
@@ -68,7 +66,6 @@ def main():
 
     mse = MSE(tensor, tensor_with_nan, tensor_estimate)
     print('MSE: {}'.format(mse))
-    # import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':
