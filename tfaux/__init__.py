@@ -1,2 +1,2 @@
-from .tucker import tucker
+from .decomposition import tucker
 from .impute import impute

@@ -1,5 +1,6 @@
 import numpy as np
-import tensorly
+from tensorly.tenalg import multi_mode_dot
+
 
 from tfaux import impute, tucker
 
@@ -13,17 +14,15 @@ def load_dataset(dim=30, R=2):
     for i in range(R):
         core[i, i, i] = 1.0
 
-    tensor = tensorly.tenalg.multi_mode_dot(core, [U, V, W])
+    tensor = multi_mode_dot(core, [U, V, W])
 
     A_I = np.diag([1, ] * (dim - 1), k=1) + np.diag([1, ] * (dim - 1), k=-1)
-    D_I = np.diag(np.sum(A_I, axis=0), k=0)
-    laplacian_I = D_I - A_I
-    laplacian_J = laplacian_I.copy()
-    laplacian_K = laplacian_I.copy()
+    A_J = A_I.copy()
+    A_K = A_I.copy()
 
-    laplacians = [laplacian_I, laplacian_J, laplacian_K]
+    similarities = [A_I, A_J, A_K]
 
-    return tensor, laplacians
+    return tensor, similarities
 
 
 def missing(tensor, missing_fraction):
@@ -56,15 +55,16 @@ def main():
     missing_fraction = 0.9
 
     ranks = [2, 2, 2]
-    alpha = 0.01
+    alpha = 0.1
     regular = 'within'
     tol = 1e-6
-    interval = 500
+    n_iter_max = 100
+    learning_rate = 1e-8
 
-    tensor, laplacians = load_dataset()
+    tensor, similarities = load_dataset(dim=30)
     tensor_with_nan = missing(tensor, missing_fraction)
 
-    tensor_estimate = impute(tensor_with_nan, laplacians, ranks, alpha, regular, tol, interval)
+    tensor_estimate = impute(tensor_with_nan, similarities, ranks, alpha, regular, tol, n_iter_max, learning_rate)
 
     mse = MSE(tensor, tensor_with_nan, tensor_estimate)
     print('MSE: {}'.format(mse))
