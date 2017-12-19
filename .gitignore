@@ -101,4 +101,4 @@ ENV/
 .mypy_cache/
 
 # dataset
-yahoo-webscope/*
+ml-100k/*
