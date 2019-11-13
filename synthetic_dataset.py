@@ -68,7 +68,6 @@ def main():
 
     mse = MSE(tensor, tensor_with_nan, tensor_estimate)
     print('MSE: {}'.format(mse))
-    # import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':

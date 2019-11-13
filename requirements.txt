@@ -1,0 +1,2 @@
+tensorly>=0.4.4
+numpy

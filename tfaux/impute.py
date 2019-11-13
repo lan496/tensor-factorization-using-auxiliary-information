@@ -1,5 +1,5 @@
 import numpy as np
-import tensorly
+from tensorly.tucker_tensor import tucker_to_tensor
 
 from .tucker import tucker
 
@@ -22,7 +22,7 @@ def impute(tensor_with_nan, laplacians, ranks, alpha, regular, tol, interval):
 
         core, factors = tucker(tensor, ranks, laplacians, n_iter_max=interval, alpha=alpha, tol=None, regular=regular, factors=factors)
 
-        tensor_tmp = tensorly.tucker_tensor.tucker_to_tensor(core, factors)
+        tensor_tmp = tucker_to_tensor((core, factors))
         variation = np.sum(np.power(tensor_tmp - tensor, 2)) / np.sum(np.power(tensor, 2))
         print(variation)
         if variation < tol:
